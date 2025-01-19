@@ -22,24 +22,24 @@
             @forelse ($pets as $pet)
                 <tr>
                     <td>
-                        <img class="img-fluid" src="{{ $pet['photoUrls'][0] ?? 'https://via.placeholder.com/150' }}" alt="No image" width="150">
+                        <img class="img-fluid" src="{{ $pet['photoUrls'][0] ?? 'https://v.wpimg.pl/ZGYyNjNldSY4GzhZYRd4M3tDbAMnTnZlLFt0SGFdaH9pAWEMJwA_NTwJIUQpHi83OA4-RD4AdSYpEGEcf0M-LioJIgs3Qz8qOxwqRX9dO3U9SnkMY1xpc2FUel1-Cnd-YEl4R39dYyM_S3hZKwg5f3sE' }}" alt="" width="150">
                     </td>
                     <td>{{ $pet['category']['name'] ?? 'Brak kategorii' }}</td>
                     <td>{{ $pet['name'] ?? 'Brak nazwy' }}</td>
                     <td>{{ $pet['status'] ?? 'Brak statusu' }}</td>
                     <td>
-                        <a href="{{ route('pets.show', $pet['id']) }}" class="btn btn-info btn-sm">View</a>
-                        <a href="{{ route('pets.update', $pet['id']) }}" class="btn btn-warning btn-sm">Edit</a>
+                        <a href="{{ route('pets.show', $pet['id']) }}" class="btn btn-info btn-sm">Podgląd</a>
+                        <a href="{{ route('pets.edit', $pet['id']) }}" class="btn btn-warning btn-sm">Etyduj</a>
                         <form action="{{ route('pets.destroy', $pet['id']) }}" method="POST" style="display:inline;">
                             @csrf
                             @method('DELETE')
-                            <button class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?')">Delete</button>
+                            <button class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?')">Usuń</button>
                         </form>
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" class="text-center">No pets available</td>
+                    <td colspan="5" class="text-center">Niema dostepnych zwierząt</td>
                 </tr>
             @endforelse
         </tbody>
@@ -47,10 +47,8 @@
 @endsection
 
 @push('scripts')
-    <!-- DataTables JS -->
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-    <!-- DataTables Initialization -->
     <script>
         $(document).ready(function() {
             $('#petsTable').DataTable({

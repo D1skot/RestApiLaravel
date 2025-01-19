@@ -1,128 +1,118 @@
 <?php
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\PetRequest;
+use App\Services\PetService;
 
 class PetController extends Controller
 {
-    private $apiBaseUrl;
+    private $petService;
 
-    public function __construct()
+    public function __construct(PetService $petService)
     {
-        $this->apiBaseUrl = env('API_BASE_URL');
+        $this->petService = $petService;
     }
 
     public function index()
     {
-        $statuses = ['available', 'pending', 'sold'];
-        $allPets  = [];
-
-        foreach ($statuses as $status) {
-            $url      = $this->apiBaseUrl . "/pet/findByStatus?status=$status";
-            $response = $this->makeCurlRequest('GET', $url);
-
-            if ($response['success'] && ! empty($response['data'])) {
-                $allPets = array_merge($allPets, $response['data']);
-            }
-        }
-
-        if (! empty($allPets)) {
-            return view('pets.index', ['pets' => $allPets]);
-        }
-
-        return back()->withErrors('Failed to fetch pets.');
+        $allPets = $this->petService->getAllPets();
+        return view('pets.index', ['pets' => $allPets]);
     }
 
     public function show($id)
     {
-        $url      = $this->apiBaseUrl . "/pet/{$id}";
-        $response = $this->makeCurlRequest('GET', $url);
+        $response = $this->petService->getPetById($id);
 
         if ($response['success']) {
             return view('pets.show', ['pet' => $response['data']]);
         }
 
-        return back()->withErrors('Pet not found.');
+        return back()->withErrors('Nie znaleziono danego zwierzęcia');
     }
+
     public function create()
     {
         return view('pets.create');
     }
 
-    public function store(Request $request)
+    public function store(PetRequest $request)
     {
-        $url  = $this->apiBaseUrl . '/pet';
+        $validatedData = $request->validated();
+
         $data = [
-            'id'     => $request->input('id'),
-            'name'   => $request->input('name'),
-            'status' => $request->input('status'),
+            'id'        => $validatedData['id'],
+            'name'      => $validatedData['name'],
+            'status'    => $validatedData['status'],
+            'category'  => [
+                'id'   => $validatedData['category_id'],
+                'name' => $validatedData['category_name'],
+            ],
+            'photoUrls' => [$validatedData['photo_url']],
+            'tags'      => collect($request->input('tags', []))->map(function ($tag) {
+                return [
+                    'id'   => $tag['id'] ?? 0,
+                    'name' => $tag['name'] ?? '',
+                ];
+            })->toArray(),
         ];
 
-        $response = $this->makeCurlRequest('POST', $url, $data);
+        $response = $this->petService->createPet($data);
 
         if ($response['success']) {
-            return redirect()->route('pets.index')->with('success', 'Pet added successfully!');
+            return redirect()->route('pets.index')->with('success', 'Zwierzę zostało pomyślnie dodane!');
         }
 
-        return back()->withErrors('Failed to add pet.');
+        return back()->withErrors($response['error'] ?? 'Nie udało się dodać zwierzęcia.');
     }
 
-    public function update(Request $request, $id)
+    public function edit($id)
     {
-        $url  = $this->apiBaseUrl . "/pet/{$id}";
-        $data = [
-            'name'   => $request->input('name'),
-            'status' => $request->input('status'),
-        ];
-
-        $response = $this->makeCurlRequest('PUT', $url, $data);
+        $response = $this->petService->getPetById($id);
 
         if ($response['success']) {
-            return redirect()->route('pets.index')->with('success', 'Pet updated successfully!');
+            return view('pets.edit', ['pet' => $response['data']]);
         }
 
-        return back()->withErrors('Failed to update pet.');
+        return back()->withErrors('Nie znaleziono danego zwierzęcia');
+    }
+
+    public function update(PetRequest $request, $id)
+    {
+        $validatedData = $request->validated();
+
+        $data = [
+            'name'      => $validatedData['name'],
+            'status'    => $validatedData['status'],
+            'category'  => [
+                'id'   => $validatedData['category_id'],
+                'name' => $validatedData['category_name'],
+            ],
+            'photoUrls' => [$validatedData['photo_url']],
+            'tags'      => collect($request->input('tags', []))->map(function ($tag) {
+                return [
+                    'id'   => $tag['id'] ?? 0,
+                    'name' => $tag['name'] ?? '',
+                ];
+            })->toArray(),
+        ];
+
+        $response = $this->petService->updatePet($id, $data);
+
+        if ($response['success']) {
+            return redirect()->route('pets.index')->with('success', 'Zwierzę zostało pomyślnie zaktualizowane!');
+        }
+
+        return back()->withErrors($response['error'] ?? 'Nie udało się zaktualizować zwierzęcia.');
     }
 
     public function destroy($id)
     {
-        $url      = $this->apiBaseUrl . "/pet/{$id}";
-        $response = $this->makeCurlRequest('DELETE', $url);
+        $response = $this->petService->deletePet($id);
 
         if ($response['success']) {
-            return redirect()->route('pets.index')->with('success', 'Pet deleted successfully!');
+            return redirect()->route('pets.index')->with('success', 'Zwierzę zostało usunięte!');
         }
 
-        return back()->withErrors('Failed to delete pet.');
-    }
-
-    private function makeCurlRequest($method, $url, $data = [])
-    {
-        $ch = curl_init();
-
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-
-        if (in_array($method, ['POST', 'PUT'])) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        }
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode >= 200 && $httpCode < 300) {
-            return [
-                'success' => true,
-                'data'    => json_decode($response, true),
-            ];
-        }
-
-        return [
-            'success' => false,
-            'error'   => json_decode($response, true),
-        ];
+        return back()->withErrors('Nie udało się usunąć zwierzęcia.');
     }
 }
